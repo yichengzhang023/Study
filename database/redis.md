@@ -25,7 +25,7 @@ java中的NIO使用的就是多路复用机制。不同操作系统多路复用�
 select 监视三种fd 分别是read write 和except 调用select会阻塞到有数据 或者超时。返回后可以通过遍历fdset找到就绪的描述符。有最大监视限制(Linux 上为1024个)
 
 #### poll
-poll将三个fdset视为一个pollfd 管理监视的event和发生的evenet 类似select 轮询pollfd来获取就绪的描述符
+poll将三个fdset视为一个pollfd 管理监视的event和发生的event 类似select 轮询pollfd来获取就绪的描述符
 #### epoll
 主要是三个接口
 ```c
