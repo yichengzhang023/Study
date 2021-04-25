@@ -29,6 +29,22 @@
     - [Nark-Sweep](#nark-sweep)
     - [Copying](#copying)
     - [Mark-Compact](#mark-compact)
+  - [堆内存逻辑分区](#堆内存逻辑分区)
+    - [逻辑分代](#逻辑分代)
+    - [分配](#分配-1)
+      - [对象什么时候进入老年代](#对象什么时候进入老年代)
+      - [分配担保](#分配担保)
+- [常见垃圾回收器](#常见垃圾回收器)
+  - [Serial + Serial Old](#serial--serial-old)
+  - [ParNew + CMS （1.6/1.7）](#parnew--cms-1617)
+  - [Parallel Scavenge + ParallelOld](#parallel-scavenge--parallelold)
+  - [G1 (10ms stw) （1.8之后）](#g1-10ms-stw-18之后)
+  - [ZGC](#zgc)
+  - [Shenadoah](#shenadoah)
+- [业务场景采用](#业务场景采用)
+  - [G1](#g1)
+    - [ZGC](#zgc-1)
+    - [常用参数](#常用参数)
 
 # java执行顺序
 **javac** -> .class文件 -> ClassLoader(包含java类库 如String等) -> 解释器或者即时编译 ->执行引擎
@@ -173,5 +189,76 @@ new 对象 为半初始化 并且复制一份在栈帧中，之后弹出复制�
 
 ## GC Algorithms
 ### Nark-Sweep
+标记清楚 找到不需要使用的 清除 **在存活对象比较多的时候效率比较高** 但是会经历两遍扫描 容易产生碎片 (不适合eden区)
 ### Copying
+内存一分为二 复制有用的对象去另一半 清除另外一半
+是和存活对象较少的情况 效率提高 没有碎片 但是会浪费空间调整对象引用 比较适合eden区
 ### Mark-Compact
+整理之后并且压缩
+会移动对象 效率偏低 但是不会产生碎片
+
+## 堆内存逻辑分区
+ (主流为分代模型)
+ 新生代 (1) + 老年代 (2) + 永久代(MetaSpcae)
+ G1回收器属于逻辑分代 物理不分
+ ZGC不分代
+ ### 逻辑分代
+ * 新生代 （new / young
+  刚new出来的对象 由于存活对象比较少 所以适用copying算法
+  eden(8) + survivor(2)
+  eden区回收一次之后 进入survivor
+  在年轻代回收(年轻代空间耗尽)的称为minor gc 或者ygc
+ * 老年代 (old)
+  垃圾回收很多次都没有被回收的 比较适合mark-compact算法
+  老年代回收的称为fullgc (major gc)
+### 分配
+栈上分配(速度更快 不需要垃圾回收) -> thread local allocation buffer分配(每个线程在eden区中的独有的1%空间) -> 老年代(大对象) -> eden区
+#### 对象什么时候进入老年代
+XX:MaxTenuringThreshold 指定次数 (YGC次数)
+Parallel Scavenge 15次
+CMS 6次
+G1 15次
+动态年龄 (survivor 某个区使用超过了50% 年龄最大的放入Old)
+#### 分配担保
+YGC期间 survivor区空间不够了 空间担保直接进入老年代
+
+# 常见垃圾回收器
+![common_garbage_collectors](../static/img/common_gcs.png)
+## Serial + Serial Old
+找一个safe point STW 复制算法 单线程gc 适合内存较小的情况
+mark-compact方式收集
+## ParNew + CMS （1.6/1.7）
+ParNew 即为 parellel new (为parallel scavnae的增强 为了和cms配合) 
+CMS 为 concurrent mark sweep 分为四步
+  1. inital mark 初始标记
+      stw的标记 标记gc root
+  2. concurrent mark (最浪费时间的阶段)
+      并发的标记(指可以同时运行程序不被暂停)
+       (三色扫描加Incremntal update)
+  3. remark
+      重新标记(并行的) 并发标记阶段产生的垃圾重新标记 
+  4. concurrent sweep
+      并发清理 此阶段产生的垃圾会在下一个过程清理
+## Parallel Scavenge + ParallelOld 
+jdk默认的为PS+PO
+和serial的区别为 清理垃圾的线程为多线程 mark-compact方式收集
+## G1 (10ms stw) （1.8之后）
+concurrent mark阶段算法和cms不同 (三色标记加SATB)
+## ZGC
+concurrent mark阶段算法和cms不同 (coloredPointers + 写屏障)
+## Shenadoah
+concurrent mark阶段算法和cms不同 (coloredPointers + 读屏障)
+# 业务场景采用
+吞吐量优先的可以使用PS + PO
+响应时间优先的可以使用G1
+## G1
+一般来说200ms可以响应 如果需要高吞吐量可以使用PN
+采用了divide and conquer的思想去管理内存模型 着重收集垃圾最多 存活对象最少的区域(Garbage First)
+### ZGC
+颜色指针(几个位置标识对象是否变过的状态)
+### 常用参数
+-XX:+UseG1GC
+-XX:+MaxGCPauseMillis 停顿时间
+-XX:+NewSizePercent 新生代的最小比例
+-XX:+NewMaxSizePercent 新生代的最大比例
+-XX:+G1HeapRegionSize 建议逐渐增加 size增加 垃圾存活时间越长 GC时间更长 越小GC间隔时间短
