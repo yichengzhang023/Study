@@ -26,7 +26,7 @@
 - [GC](#gc)
   - [判断垃圾的方法](#判断垃圾的方法)
   - [GC Algorithms](#gc-algorithms)
-    - [Nark-Sweep](#nark-sweep)
+    - [Mark-Sweep](#mark-sweep)
     - [Copying](#copying)
     - [Mark-Compact](#mark-compact)
   - [堆内存逻辑分区](#堆内存逻辑分区)
@@ -75,7 +75,7 @@ Method Area 1.7之前叫Permanent Generation 1.8之后叫metaspace
 * CustomClassloader 自定义的classLoader
 
 ## **重要** 双亲委派加载关系
-Bootstrap 加载extesin/app 的classloader
+Bootstrap 加载extension/app 的classloader
 如果自定义classloader未找到 去父加载器app 加载找 如果再没找到 去extension找 最后去bootstrap
 之后bootstrap会反过来委派
 ![classloader_process](../static/img/classloader.png)
@@ -188,7 +188,7 @@ new 对象 为半初始化 并且复制一份在栈帧中，之后弹出复制�
    从root对象开始搜索 stack变量 static变量 常量池 JNI指针 程序启动的时候马上需要的对象称为根对象
 
 ## GC Algorithms
-### Nark-Sweep
+### Mark-Sweep
 标记清楚 找到不需要使用的 清除 **在存活对象比较多的时候效率比较高** 但是会经历两遍扫描 容易产生碎片 (不适合eden区)
 ### Copying
 内存一分为二 复制有用的对象去另一半 清除另外一半
@@ -228,7 +228,7 @@ YGC期间 survivor区空间不够了 空间担保直接进入老年代
 找一个safe point STW 复制算法 单线程gc 适合内存较小的情况
 mark-compact方式收集
 ## ParNew + CMS （1.6/1.7）
-ParNew 即为 parellel new (为parallel scavnae的增强 为了和cms配合) 
+ParNew 即为 parellel new (为parallel scavenge的增强 为了和cms配合) 
 CMS 为 concurrent mark sweep 分为四步
   1. inital mark 初始标记
       stw的标记 标记gc root
@@ -243,7 +243,7 @@ CMS 为 concurrent mark sweep 分为四步
 jdk默认的为PS+PO
 和serial的区别为 清理垃圾的线程为多线程 mark-compact方式收集
 ## G1 (10ms stw) （1.8之后）
-concurrent mark阶段算法和cms不同 (三色标记加SATB)
+concurrent mark阶段算法和cms不同 (三色标记加SATB(snapshot at beginning))
 ## ZGC
 concurrent mark阶段算法和cms不同 (coloredPointers + 写屏障)
 ## Shenadoah
