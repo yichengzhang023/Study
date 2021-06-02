@@ -15,6 +15,10 @@
     - [主从同步](#主从同步)
 - [索引补充](#索引补充)
   - [MyISAM 和 Innodb的不同点](#myisam-和-innodb的不同点)
+  - [Undo log Redo log 和 Binary log](#undo-log-redo-log-和-binary-log)
+    - [Undo log](#undo-log)
+    - [Redo log](#redo-log)
+    - [Bin log](#bin-log)
   
 
 ## 引擎
@@ -138,6 +142,13 @@ $$ ({{-\infty}}, 10],(10,20](20,30](30,{{+\infty}}]$$
 数据库设计新建节点的时候 会申请一个页的空间 因为计算机储存按页对齐 就实现了读取一个node只需要一次I/O
 B-tree 因为高度(h)比较小 每个节点的一片比较大 所以检索次数只需要h-1次I/O
 
+为什么说B+树比B树更适合数据库索引？
+1、 B+树的磁盘读写代价更低：B+树的内部节点并没有指向关键字具体信息的指针，因此其内部节点相对B树更小，如果把所有同一内部节点的关键字存放在同一盘块中，那么盘块所能容纳的关键字数量也越多，一次性读入内存的需要查找的关键字也就越多，相对IO读写次数就降低了。
+
+2、B+树的查询效率更加稳定：由于非终结点并不是最终指向文件内容的结点，而只是叶子结点中关键字的索引。所以任何关键字的查找必须走一条从根结点到叶子结点的路。所有关键字查询的路径长度相同，导致每一个数据的查询效率相当。
+
+3、由于B+树的数据都存储在叶子结点中，分支结点均为索引，方便扫库，只需要扫一遍叶子结点即可，但是B树因为其分支结点同样存储着数据，我们要找到具体的数据，需要进行一次中序遍历按序来扫，所以B+树更加适合在区间查询的情况，所以通常B+树用于数据库索引。
+
 ### MyISAM 和 Innodb的不同点
 前文提到 MyISAM使用非聚簇索引 准确的说 MyISAM的所有索引 即包含primary key 和secondary key都会存放数据的逻辑储存地址 如图所示：
 ![myisam索引](../static/img/myisam_index.png)
@@ -146,3 +157,47 @@ Innodb 数据文件本身就是索引文件(MyISAM 是索引文件和数据文�
 ![innodbPK](../static/img/innodb_pk.png)
 
 ![innodbindex](../static/img/innodb_index.png)
+
+### Undo log Redo log 和 Binary log
+
+#### Undo log
+
+- 撤销用的日志 对于insert操作 undo 日志记录新数据的row id 回滚时直接删除
+- 对于delete update操作 undo日志记录旧数据 回滚时直接恢复
+- 他们分别储存在不同的buffer中
+
+#### Redo log
+
+- 以恢复为目的的备份
+- 防止在发生故障的时间点，缓冲池（buffer pool）尚有脏页未写入表的 IBD 文件中，在重启 MySQL 服务的时候，根据 Redo Log 进行重做，从而达到事务的未入磁盘数据进行持久化这一特性。一旦事务成功提交且数据从缓冲池（buffer pool）持久化到表的 IBD 文件中之后，此时 Redo Log 中的对应事务数据记录就失去了意义，所 以 Redo Log 的写入是日志文件循环写入的过程，也就是覆盖写的过程
+- Redo Buffer 持久化到 Redo Log 的策略，通过设置 Innodb_flush_log_at_trx_commit 的值：
+
+  - 取值0：每秒提交 Redo buffer -> Redo Log OS cache -> flush cache to disk，可能丢失一秒内的事务数据。
+
+  - 取值1（默认值）：每次事务提交执行 Redo Buffer -> Redo Log OS cache -> flush cache to disk，最安全，性能最差的方式
+
+  - 取值2：每次事务提交执行 Redo Buffer -> Redo log OS cache 再每一秒执行 -> flush cache to disk 操作
+
+#### Bin log
+
+bin log 用于记录数据库执行的写入性操作(不包括查询)信息，以二进制的形式保存在磁盘中。binlog 是 mysql的逻辑日志（可以简单理解为记录的就是sql语句），并且由 Server 层进行记录，使用任何存储引擎的 mysql 数据库都会记录 binlog 日志
+
+在实际应用中， binlog 的主要使用场景有两个，分别是 主从复制 和 数据恢复 。
+
+主从复制 ：在 Master 端开启 binlog ，然后将 binlog 发送到各个 Slave 端， Slave 端重放 binlog 从而达到主从数据一致。
+数据恢复 ：通过使用 mysql bin log 工具来恢复数据。
+
+bin log 刷盘时机
+
+1. 系统判断何时写入磁盘
+2. 每次commit 写入
+3. 每N个事务写入一次
+
+bin log日志格式
+
+1. STATEMENT
+基于SQL语句的复制 不需要记录每一行的变化 减少了bin log日志量
+2. ROW
+基于行的复制 不记录上下文 仅记录哪条数据被修改
+3. MIXED
+两种模式的组合

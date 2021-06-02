@@ -1,4 +1,4 @@
-cglib和jdk动态代理区别：
+# cglib和jdk动态代理区别
 
 1、Jdk动态代理：利用拦截器（必须实现InvocationHandler）加上反射机制生成一个代理接口的匿名类，在调用具体方法前调用InvokeHandler来处理
 
