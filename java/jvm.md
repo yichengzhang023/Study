@@ -203,8 +203,8 @@ new 对象 为半初始化 并且复制一份在栈帧中，之后弹出复制�
  G1回收器属于逻辑分代 物理不分
  ZGC不分代
  ### 逻辑分代
- * 新生代 （new / young
-  刚new出来的对象 由于存活对象比较少 所以适用copying算法
+ * 新生代 （new / young）
+  对象比较少 所以适用copying算法
   eden(8) + survivor(2)
   eden区回收一次之后 进入survivor
   在年轻代回收(年轻代空间耗尽)的称为minor gc 或者ygc
