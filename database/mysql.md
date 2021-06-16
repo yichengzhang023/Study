@@ -4,6 +4,7 @@
   - [覆盖索引和回表](#覆盖索引和回表)
 - [锁](#锁)
   - [常见的锁](#常见的锁)
+  - [什么是死锁？怎么解决？](#什么是死锁怎么解决)
 - [事务](#事务)
   - [事务基本特性](#事务基本特性)
     - [ACID](#acid)
@@ -65,6 +66,22 @@ e.g. 假设我们有索引为 `KEY `sim` (`sim`) USING BTREE`
 最后加上 for update 即为排他锁
 按颗粒度来区分 又分为 ***行锁和表锁***
 表锁通常会在alter表的时候使用 行锁则是修改操作时使用
+
+### 什么是死锁？怎么解决？
+
+死锁是指两个或多个事务在同一资源上相互占用，并请求锁定对方的资源，从而导致恶性循环的现象。
+
+常见的解决死锁的方法
+
+1、如果不同程序会并发存取多个表，尽量约定以相同的顺序访问表，可以大大降低死锁机会。
+
+2、在同一个事务中，尽可能做到一次锁定所需要的所有资源，减少死锁产生概率；
+
+3、对于非常容易产生死锁的业务部分，可以尝试使用升级锁定颗粒度，通过表级锁定来减少死锁产生的概率；
+
+4.设置超时参数 innodb_lock_wait_timeout=10s
+如果业务处理不好可以用分布式事务锁或者使用乐观锁
+
 
 ## 事务
 
@@ -220,8 +237,3 @@ bin log日志格式
 基于行的复制 不记录上下文 仅记录哪条数据被修改
 3. MIXED
 两种模式的组合
-
-
-/www/server/mysql/bin/mysqld --basedir=/www/server/mysql --datadir=/www/server/data --plugin-dir=/www/server/mysql/lib/plugin --user=mysql --sql-mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION --log-error=mgo-tech.err --open-files-limit=65535 --pid-file=/www/server/data/mgo-tech.pid --socket=/tmp/mysql.sock --port=3306
-
-/bin/sh /www/server/mysql/bin/mysqld_safe --datadir=/www/server/data --pid-file=/www/server/data/mgo-tech.pid --sql-mode=NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
