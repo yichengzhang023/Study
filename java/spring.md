@@ -5,6 +5,8 @@
   - [Environment](#environment)
   - [如何从配置文件加载bean](#如何从配置文件加载bean)
   - [Springboot 启动流程](#springboot-启动流程)
+  - [Spring 事务机制](#spring-事务机制)
+  - [Spring事务失效](#spring事务失效)
 
 
 # Spring IOC
@@ -51,4 +53,17 @@ BeanDefinitionMap/BeanDefinitionNames
   2. 设置应用上下文
   3. 设置异常报告器
   4. 设置(java.awt.headless 提供给无输入的平台使用)
-基本的配置都位于spring.factories文件中  
+基本的配置都位于spring.factories文件中 
+
+## Spring 事务机制
+
+1. 底层基于数据库事务和AOP机制
+2. 对于加了@Transactional注解的Bean 会创建一个代理Bean
+3. 修改数据库连接中的autocommit为false
+4. 然后执行sql 并判断是否回滚或者提交
+5. 事务传播机制是基于数据库连接来做的 如果事务中包含另外一个事务 那么会先建立一个数据库连接 再执行sql
+
+## Spring事务失效
+
+被代理对象不会生效
+private方法会失效 因为底层是基于cglib来实现的 子类不能重载父类的private的方法
