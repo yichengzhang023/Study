@@ -43,6 +43,7 @@
   - [Shenadoah](#shenadoah)
 - [业务场景采用](#业务场景采用)
   - [G1](#g1)
+  - [跨代引用问题](#跨代引用问题)
   - [常用参数](#常用参数)
 
 # java执行顺序
@@ -299,13 +300,16 @@ CMS 为 concurrent mark sweep 分为四步
        2.方法区中的类静态属性引用的对象
        3.方法区中的常量引用的对象
        4.原生方法栈（Native Method Stack）中 JNI 中引用的对象
+       5.内部引用
+       6.同步锁持有的对象
+       7.本地代码缓存等
 
   2. concurrent mark (最浪费时间的阶段)
       并发的标记(指可以同时运行程序不被暂停)
        (三色扫描加Incremntal update 增量更新)
 
   3. remark
-      重新标记(并行的) 并发标记阶段产生的垃圾重新标记
+      重新标记(并行的) 并发标记阶段产生的垃圾重新标记 stw的标记
 
   4. concurrent sweep
       并发清理 此阶段产生的垃圾会在下一个过程清理
@@ -344,6 +348,10 @@ concurrent mark阶段算法和cms不同 (coloredPointers + 读屏障)
 采用了divide and conquer的思想去管理内存模型 着重收集垃圾最多 存活对象最少的区域(Garbage First)
 
 当老年代存活对象较多时，每次Minor GC查询老年代所有对象影响回收效率（因为GC会 stop-the-world），所以在老年代有一个write barrier（写屏障）来管理的card table（卡表），card table存放了所有老年代对象对新生代对象的引用
+
+## 跨代引用问题
+
+为了解决对象跨代引用的问题 使用card表和内存页的对应关系管理 如果存在跨代引用 即说明卡为dirty card
 
 ## 常用参数
 
