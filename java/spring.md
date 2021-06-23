@@ -13,7 +13,7 @@
 
 ## bean的注册流程
 
-xml / 注解 / yml / properties 抽象为beandefination -> 通过扩展 完成功能的扩展(BeanFacotryProcesser) -> 通过反射实例化 -> 生成可用的bean
+xml / 注解 / yml / properties 抽象为beanDefinition -> 通过扩展 完成功能的扩展(BeanFactoryProcessor) -> 通过反射实例化 -> 生成可用的bean
 
 ## 创建bean
 
