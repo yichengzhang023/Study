@@ -37,6 +37,8 @@
 - [常见垃圾回收器](#常见垃圾回收器)
   - [Serial + Serial Old](#serial--serial-old)
   - [ParNew + CMS （1.6/1.7）](#parnew--cms-1617)
+    - [CMS存在的问题及原因](#cms存在的问题及原因)
+    - [三色标记](#三色标记)
   - [Parallel Scavenge + ParallelOld](#parallel-scavenge--parallelold)
   - [G1 (10ms stw) （1.8之后）](#g1-10ms-stw-18之后)
   - [ZGC](#zgc)
@@ -314,11 +316,41 @@ CMS 为 concurrent mark sweep 分为四步
   4. concurrent sweep
       并发清理 此阶段产生的垃圾会在下一个过程清理
 
-CMS存在的问题及原因
+### CMS存在的问题及原因
 
 1. 浮动垃圾 并行标记 所以会产生浮动垃圾
 
 2. 由于CMS老年代使用标记-清除回收策略，因此会有内存碎片问题。当碎片过多时，将会给大对象分配带来麻烦，往往会出现老年代还有很多空间但就已经不能保存对象了。不得不提前触发一次Full GC。为了解决这个问题，CMS收集器提供了-XX:UseCMSCompactAtFullCollection开关参数，用于在CMS收集器不得不进行Full GC时开启内存碎片的合并整理过程。 有参数可以配置有多少次Full GC会堆内存碎片进行整理(-XX:CMSFullGCsBeforeCompaction)
+
+### 三色标记
+
+**三色标记具体指那三色？**
+
+白色、灰色和黑色。
+
+黑色：根对象，或者该对象与它的子对象都被扫描过。
+
+灰色：对象本身被扫描，但是还有没扫描该对象的子对象。
+
+白色：未被扫描的对象，如果扫描完成所有对象之后，最终为白色的为不可达对象，即垃圾对象、
+
+**出现对象消失的问题 (黑色对象被误标记为白色)**
+
+当且仅当以下两个条件同时满足：
+
+  赋值器插入了一条或多条从黑色对象到白色对象的新引用；
+
+  赋值器删除了全部从灰色对象到该白色对象的直接或间接引用。
+
+**那如何解决并发扫描时对象消失问题？**
+
+只需要破坏这两个条件任意一个即可，两种解决方案：增量更新（Increamental Update）和原始快照（Snap shot At The Begining, SATB）
+
+CMS 基于 增量更新（Increamental Update）来做并发标记，G1 基于 原始快照（Snap shot At The Begining, SATB）来实现的。
+
+增量更新（Increamental Update）：当一个白色对象被黑色对象引用，将黑色对象重新标记为灰色，让垃圾回收器重新扫描。
+
+原始快照（Snap shot At The Begining, SATB）：原始快照要破坏的是第二个条件，当灰色对象要删除指向白色对象的引用关系时，就将这个要删除的引用记录下来，在并发扫描结束之后，再将这些记录过得引用关系中的灰色对象为根，重新扫描一次。总而言之就是：无论引用关系删除与否，都会按照刚刚开始扫描的那一刻的对象图快照来进行搜索
 
 ## Parallel Scavenge + ParallelOld
 
@@ -360,3 +392,8 @@ concurrent mark阶段算法和cms不同 (coloredPointers + 读屏障)
 -XX:+NewSizePercent 新生代的最小比例
 -XX:+NewMaxSizePercent 新生代的最大比例
 -XX:+G1HeapRegionSize 建议逐渐增加 size增加 垃圾存活时间越长 GC时间更长 越小GC间隔时间短
+-Xms400m 初始内存
+-Xmx400m 最大内存
+-XX:PermSize=200M 永久代大小
+-XX:NewRatio=4 年轻代与老年代比例为4:6
+-XX:SurvivorRatio=4 设置年轻代中Eden区与Survivor区的大小比值。设置为4，则两个Survivor区与一个Eden区的比值为2:4，一个Survivor区占整个年轻代的1/6
