@@ -92,3 +92,7 @@ LinkedHashMap 保存了记录的插入顺序，在用 Iterator 遍历时，先�
 
 21.ConcurrentHashMap 的并发度是什么？
 程序运行时能够同时更新 ConcurrentHashMap 且不产生锁竞争的最大线程数。默认为 16，且可以在构造函数中设置。当用户设置并发度时，ConcurrentHashMap 会使用大于等于该值的最小2幂指数作为实际并发度（假如用户设置并发度为17，实际并发度则为32）
+
+## 深浅拷贝
+
+clone/构造器
