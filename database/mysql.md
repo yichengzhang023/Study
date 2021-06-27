@@ -2,6 +2,7 @@
   - [***myisam*** 和 ***innodb*** 的区别](#myisam-和-innodb-的区别)
   - [mysql的索引有哪些，聚簇和非聚簇索引又是什么](#mysql的索引有哪些聚簇和非聚簇索引又是什么)
   - [覆盖索引和回表](#覆盖索引和回表)
+  - [in 使用索引](#in-使用索引)
 - [锁](#锁)
   - [常见的锁](#常见的锁)
   - [什么是死锁？怎么解决？](#什么是死锁怎么解决)
@@ -50,6 +51,10 @@ e.g. 假设我们有索引为 `KEY `sim` (`sim`) USING BTREE`
 此语句的extra字段为 **Using index condition** 表示where条件中不包含选择的所有列(因为查询了all)，使用了索引查询之后 还需要回表查询其余字段(因为innodb的索引和数据其实是分开的)
 `explain select id,sim from iot_sim where sim = '1440499840795'`
 此语句的extra字段为 **Using where; Using index** 其中using index表示无需扫描整表 ‘using where’ 表示虽然有可能扫描table但是更倾向于使用index
+
+### in 使用索引
+
+in通常是走索引的，当in后面的数据在数据表中超过30%(上面的例子的匹配数据大约6000/16000 = 37.5%)的匹配时，会走全表扫描，即不走索引，因此in走不走索引和后面的数据有关系
 
 ## 锁
 
