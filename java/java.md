@@ -96,3 +96,9 @@ LinkedHashMap 保存了记录的插入顺序，在用 Iterator 遍历时，先�
 ## 深浅拷贝
 
 clone/构造器
+
+## AbstractList 线程不安全主要原因
+
+1. 扩容
+
+2. iteration 中要检查expectedModCount = modCount
