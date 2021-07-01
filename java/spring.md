@@ -19,6 +19,7 @@
     - [构造器注入](#构造器注入)
     - [setter注入](#setter注入)
     - [接口注入](#接口注入)
+  - [Springboot自动装配原理](#springboot自动装配原理)
 
 
 # Spring IOC
@@ -141,3 +142,12 @@ javabean 规范
 比如说数据库连接资源完全可以在Tomcat下配置，
 
 然后通过JNDI的方式去获取它，这样的数据库连接资源就属于开发工程外的资源
+
+## Springboot自动装配原理
+
+@SpringBootConfiguration：这个注解的底层是一个@Configuration注解，意思被@Configuration注解修饰的类是一个IOC容器，支持JavaConfig的方式来进行配置；
+
+@ComponentScan：这个就是扫描注解的意思，默认扫描当前类所在的包及其子包下包含的注解，将@Controller/@Service/@Component/@Repository等注解加载到IOC容器中；
+
+@EnableAutoConfiguration：这个注解表明启动自动装配，里面包含连个比较重要的注解@AutoConfigurationPackage和@Import。
+
