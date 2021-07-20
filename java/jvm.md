@@ -1,5 +1,6 @@
 - [java执行顺序](#java执行顺序)
 - [jvm](#jvm)
+- [JMM](#JMM)
 - [类加载器](#类加载器)
   - [加载顺序 (自顶向下)](#加载顺序-自顶向下)
   - [类加载机制](#类加载机制)
@@ -83,6 +84,52 @@ Method Area 1.7之前叫Permanent Generation 1.8之后叫metaspace，字符串�
 1.jdk1.8之前字符串常量池放在永久代，容易造成出现性能问题和内存溢出，而且只会在fullgc才会扫描清理永久代，效率低下  
 2.类以及方法的信息不容易确定其大小，放在系统内存中更适合。
 
+## JMM
+### 硬件层数据一致性
+协议很多  
+intel 用MESI
+现代CPU的数据一致性实现 = 缓存锁（MESI）+总线锁  
+总线锁：操作系统提供了总线锁定的机制。前端总线(也叫CPU总线)是所有CPU与芯片组连接的主干道，负责CPU与外界所有部件的通信，包括高速缓存、内存、北桥，其控制总线向各个部件发送控制信号、通过地址总线发送地址信号指定其要访问的部件、通过数据总线双向传输。在CPU1要操作共享变量的时候，其在总线上发出一个LOCK#信号，其他处理器就不能操作缓存了该共享变量内存地址的缓存，也就是阻塞了其他CPU，使该处理器可以独享此共享内存。  
+总线锁定把CPU和内存的通信给锁住了，使得在锁定期间，其他处理器不能操作其他内存地址的数据，从而开销较大。
+
+读取缓存以cache line为基本单位，目前64bytes  
+位于统一缓存行的两个不同数据，被两个不同cpu锁定，产生互相影响的伪共享问题  
+使用缓存行的对齐能够提高效率  
+
+### 乱序问题  
+CPU为了提高指令执行效率，会在一条指令执行过程中（比如去内存读数据（慢100倍）），去同时执行另一条指令，前提是，两条指令没有依赖关系  
+
+### 如何表征保证特定情况下不乱序
+硬件内存屏障 X86
+>  sfence:  store| 在sfence指令前的写操作当必须在sfence指令后的写操作前完成。
+>  lfence：load | 在lfence指令前的读操作当必须在lfence指令后的读操作前完成。
+>  mfence：modify/mix | 在mfence指令前的读写操作当必须在mfence指令后的读写操作前完成。
+
+> 原子指令，如x86上的”lock …” 指令是一个Full Barrier，执行时会锁住内存子系统来确保执行顺序，甚至跨多个CPU。Software Locks通常使用了内存屏障或原子指令来实现变量可见性和保持程序顺序
+
+JVM级别如何规范（JSR133）
+
+> LoadLoad屏障：
+>   	对于这样的语句Load1; LoadLoad; Load2， 
+>
+>  	在Load2及后续读取操作要读取的数据被访问前，保证Load1要读取的数据被读取完毕。
+>
+> StoreStore屏障：
+>
+>  	对于这样的语句Store1; StoreStore; Store2，
+>	
+>  	在Store2及后续写入操作执行前，保证Store1的写入操作对其它处理器可见。
+>
+> LoadStore屏障：
+>
+>  	对于这样的语句Load1; LoadStore; Store2，
+>	
+>  	在Store2及后续写入操作被刷出前，保证Load1要读取的数据被读取完毕。
+>
+> StoreLoad屏障：
+> 	对于这样的语句Store1; StoreLoad; Load2，
+>
+> ​	 在Load2及后续所有读取操作执行前，保证Store1的写入对所有处理器可见。
 
 ## 加载顺序 (自顶向下)
 
@@ -129,33 +176,39 @@ Bootstrap 加载extension/app 的classloader
 - preparation
   静态成员变量赋默认值 (int = 0...)
 - Resolution (解析)
-  ...
+  将类、方法、属性等符号引用解析为直接引用 常量池中的各种符号引用解析为指针、偏移量等内存地址的直接引用
 
 ## Initializing
 
 执行static代码，调用初始化代码
 
 ## volatile的实现
-
-jvm层面 -> 内存读写都加屏障 保证所有数据对所有处理器可见  
-storestoreBarrier  
-写操作  
-storeloadBarrier  
+1.字节码层面 ACC_VOLATILE
+2.jvm层面 -> 内存读写都加屏障 保证所有数据对所有处理器可见  
+>storestoreBarrier  
+>写操作  
+>storeloadBarrier  
   
-LoadLoadBarrier  
-读操作  
-storeloadBarrier  
+>LoadLoadBarrier  
+>读操作  
+>storeloadBarrier  
 
+3.OS和硬件层面 （总线锁/缓存锁+MESI）
+   https://blog.csdn.net/qq_26222859/article/details/52235930  
+   hsdis - HotSpot Dis Assembler  
+   windows lock 指令实现 | MESI实现  
+   当多处理器之间的竞争程度很高或者指令访问的内存地址未对齐时，仍然会锁住总线  
 ## synchronized的实现
-
+1.字节码层面
+ACC_SYNCHRONIZED
 monitorenter  
 代码块  
 monitorexit  
 
 有异常会monitorexit退出  
-jvm层面  
-操作系统提供的同步机制  
-硬件层面  
+2.jvm层面  
+c c++ 调用了操作系统提供的同步机制  
+3.os和硬件层面  
 lock 指令  
 
 # 对象的内存布局
@@ -232,7 +285,6 @@ GC默认年龄为15 是因为对象头上的分代年龄只有4bytes
   invokeSpecial invokeVirtual invokeDynamic(匿名表达式) invokeInterface  
 new 对象 为半初始化 并且复制一份在栈帧中，之后弹出复制并且计算 调用init方法之后才会初始化
 
-**局部表量表**：是一组变量值存储空间，用来存放方法参数以及方法内部定义的局部变量。局部变量表的容量是以变量槽（variable slot）为最小的单位。Java虚拟机没有明确规定一个slot所占的空间大小。只是导向性的说了每一个slot能存放8种基本数据类型中的一种(long 和double这种64位的需要两个slot)；
 
 **操作数栈**:是用来记录一个方法在执行的过程中，字节码指令向操作数栈中进行入栈和出栈的过程。大小在编译的时候已经确定了，当一个方法刚开始执行的时候，操作数栈中是空发的，在方法执行的过程中会有各种字节码指令往操作数栈中入栈和出栈。  
 **动态链接**：因为字节码文件中有很多符号的引用，这些符号引用一部分会在类加载的解析阶段或第一次使用的时候转化成直接引用，这种称为静态解析；另一部分会在运行期间转化为直接引用，这部分称为动态链接。  
@@ -357,19 +409,19 @@ ParNew 即为 parellel new (为parallel scavenge的增强 为了和cms配合)
 CMS 为 concurrent mark sweep 分为四步
 
   1. inital mark 初始标记
-      stw的标记 标记gc root
-      如何确定GC root:
-       1.虚拟机栈(栈帧中的本地变量表)中引用的对象；
-       2.方法区中的类静态属性引用的对象
-       3.方法区中的常量引用的对象
-       4.原生方法栈（Native Method Stack）中 JNI 中引用的对象
-       5.内部引用
-       6.同步锁持有的对象
-       7.本地代码缓存等
+      stw的标记 标记gc root  
+      如何确定GC root:  
+       1.虚拟机栈(栈帧中的本地变量表)中引用的对象； 
+       2.方法区中的类静态属性引用的对象  
+       3.方法区中的常量引用的对象  
+       4.原生方法栈（Native Method Stack）中 JNI 中引用的对象  
+       5.内部引用  
+       6.同步锁持有的对象  
+       7.本地代码缓存等  
 
   2. concurrent mark (最浪费时间的阶段)
       并发的标记(指可以同时运行程序不被暂停)
-       (三色扫描加Incremntal update 增量更新)
+       (三色扫描加Incremental update 增量更新)
 
   3. remark
       重新标记(并行的) 并发标记阶段产生的垃圾重新标记 stw的标记
@@ -432,7 +484,7 @@ concurrent mark阶段算法和cms不同 (coloredPointers + 读屏障)
 
 # 业务场景采用
 
-吞吐量优先的可以使用PS + PO
+吞吐量优先的可以使用PS + PO  
 响应时间优先的可以使用G1
 
 ## G1
@@ -441,6 +493,59 @@ concurrent mark阶段算法和cms不同 (coloredPointers + 读屏障)
 采用了divide and conquer的思想去管理内存模型 着重收集垃圾最多 存活对象最少的区域(Garbage First)
 
 当老年代存活对象较多时，每次Minor GC查询老年代所有对象影响回收效率（因为GC会 stop-the-world），所以在老年代有一个write barrier（写屏障）来管理的card table（卡表），card table存放了所有老年代对象对新生代对象的引用
+
+补充：
+G1特点
+
+并发收集
+
+压缩空闲空间不会延长GC的暂停时间
+
+更易预测的GC停顿时间
+
+适用不需要实现很高的吞吐量的场景
+
+
+
+CSet
+
+一组可被回收的分区的集合
+
+在CSet中存活的数据会在GC过程中被移动到另一个可用分区
+
+CSet中的分区可以来自Eden空间、survivor空间、或者老年代
+
+CSet会占用不到整个堆空间的1%大小
+
+card table
+
+* Card Table
+  由于做YGC时，需要扫描整个OLD区，效率非常低，所以JVM设计了CardTable， 如果一个OLD区CardTable中有对象指向Y区，就将它设为Dirty，下次扫描时，只需要扫描Dirty Card
+  在结构上，Card Table用BitMap来实现
+  
+RSet 
+
+记录了其他Region中的对象到本Region中的引用
+
+Rset的价值在于
+
+使得垃圾回收器不需要扫描整个堆找到谁引用了当前分区中的对象。
+
+只需要扫描Rset即可
+
+由于Rset的存在，那么每次给对象赋引用的时候，就得做一些额外的操作
+
+指的是在Rset中做一些额外的记录（在GC中被称为写屏障）
+
+
+
+新老年代比例
+
+5%-60%
+
+-一般不用手工指定
+
+-也不要手工指定，因为这是G1预测停顿时间的基准
 
 ## 跨代引用问题
 
