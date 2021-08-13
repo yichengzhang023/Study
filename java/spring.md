@@ -151,3 +151,15 @@ javabean 规范
 
 @EnableAutoConfiguration：这个注解表明启动自动装配，里面包含连个比较重要的注解@AutoConfigurationPackage和@Import。
 
+自动装配原理总结如下：
+@EnableAutoConfigration 注解会导入一个自动配置选择器（AutoConfigurationImportSelector）去扫描每个jar包的META-INF/spring.factories 这个文件，这个文件是一个key-value形式的配置文件，里面存放了这个jar包依赖的具体依赖的自动配置类。这些自动配置类又通过@EnableConfigurationProperties 注解支持通过xxxxProperties 读取application.properties/application.yml属性文件中我们配置的值。如果我们没有配置值，就使用默认值，这就是所谓约定>配置的具体落地点
+
+
+
+## 拦截器和过滤器的区别
+拦截器是基于java的反射机制的，而过滤器是基于函数回调。
+拦截器不依赖于servlet容器，过滤器依赖于servlet容器。
+拦截器只能对action请求起作用，而过滤器则可以对几乎所有的请求起作用。
+拦截器可以访问action上下文、值栈里的对象，而过滤器不能访问。
+在action的生命周期中，拦截器可以多次被调用，而过滤器只能在容器初始化时被调用一次
+拦截器可以获取IOC容器中的各个bean，而过滤器就不行，这点很重要，在拦截器里注入一个service，可以调用业务逻辑。
